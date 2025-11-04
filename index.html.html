@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>전공배정 성적 계산기 (2025)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple SD Gothic Neo, Noto Sans KR, "맑은 고딕", sans-serif;
+            margin: 0;
+            background: #f6f7f9;
+            color: #111;
+        }
+
+        header {
+            padding: 24px 16px;
+            background: white;
+            position: sticky;
+            top: 0;
+            border-bottom: 1px solid #e9ecf1;
+            z-index: 1000;
+        }
+
+        .container {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .card {
+            background: white;
+            border: 1px solid #e9ecf1;
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+            max-width: 764px;
+            /* 732px content + 32px padding */
+        }
+
+        /* 통일된 그리드: 헤더/행 동일한 폭을 사용 */
+        .row {
+            display: grid;
+            grid-template-columns: 260px 90px 140px 170px 40px;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .row.header {
+            font-weight: 600;
+            color: #444;
+        }
+
+        input,
+        select,
+        button {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d7dde5;
+            border-radius: 12px;
+            background: #fff;
+        }
+
+        select {
+            appearance: none;
+            background-image: linear-gradient(45deg, transparent 50%, #999 50%), linear-gradient(135deg, #999 50%, transparent 50%);
+            background-position: calc(100% - 16px) calc(1em + 2px), calc(100% - 11px) calc(1em + 2px);
+            background-size: 5px 5px, 5px 5px;
+            background-repeat: no-repeat;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        .add {
+            background: #111;
+            color: #fff;
+            border: none;
+        }
+
+        .del {
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
+        .muted {
+            color: #666;
+            font-size: 13px;
+        }
+
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .summary .item {
+            background: #111;
+            color: #fff;
+            padding: 16px;
+            border-radius: 14px;
+        }
+
+        .summary .item span {
+            display: block;
+            font-size: 12px;
+            opacity: .8;
+        }
+
+        .summary .item strong {
+            font-size: 20px;
+        }
+
+        .footer {
+            margin-top: 12px;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .notice {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #555;
+        }
+
+        .pf-hidden {
+            display: none;
+        }
+
+        /* 숫자 스핀 버튼 제거 */
+        input[type=number]::-webkit-outer-spin-button,
+        input[type=number]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+
+        /* 과목명 중복 경고 뱃지와 강조 */
+        .fieldwrap {
+            position: relative;
+        }
+
+        .dupWarn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 12px;
+            color: #b91c1c;
+            background: #fee2e2;
+            border: 1px solid #fecaca;
+            padding: 2px 6px;
+            border-radius: 999px;
+            display: none;
+        }
+
+        .dup .dupWarn {
+            display: inline-block;
+        }
+
+        .dup input.name {
+            border-color: #ef4444;
+            background: #fff1f2;
+        }
+
+        .actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+            max-width: 732px;
+            /* 260px + 90px + 140px + 170px + 40px + (8px * 4 gaps) */
+        }
+
+        .summary .item.final {
+            grid-column: span 3;
+        }
+
+        @media (max-width: 900px) {
+            .row {
+                grid-template-columns: 1fr 80px 120px 160px 110px 32px;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .row {
+                grid-template-columns: 1fr 70px 110px 150px 100px 32px;
+            }
+
+            .summary {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .summary .item.final {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .row {
+                grid-template-columns: 1.8fr 0.5fr 0.7fr 0.7fr 32px;
+                /* 과목명 / 학점 / 평가 / 성적 / X */
+                gap: 4px;
+            }
+
+            .row input,
+            .row select {
+                padding: 6px 8px;
+                font-size: 12px;
+            }
+
+            .row.header {
+                font-size: 12px;
+            }
+        }
+
+        /* 가중치 적용 과목 시각 강조 */
+        .row.wgt .fieldwrap .name {
+            color: #1d4ed8;
+            background: #eff6ff;
+            border-color: #93c5fd;
+            font-weight: 600;
+        }
+
+        .row.wgt .dupWarn {
+            background: #dbeafe;
+            border-color: #bfdbfe;
+            color: #1d4ed8;
+        }
+
+        /* Department scores collapsible section */
+        .dept-scores-card {
+            margin-top: 16px;
+            padding: 12px 16px;
+        }
+
+        .dept-scores-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f1f3f4;
+            max-width: 732px;
+            /* Match main grid width */
+        }
+
+        .dept-scores-header h3 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .toggle-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: #111;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+            width: auto;
+        }
+
+        .toggle-btn:hover {
+            background: #333;
+            transform: translateY(-1px);
+        }
+
+        .toggle-icon {
+            transition: transform 0.3s ease;
+            font-size: 10px;
+            width: 12px;
+            text-align: center;
+        }
+
+        .dept-scores-content {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+
+        .dept-scores-content.collapsed {
+            max-height: 0;
+            opacity: 0;
+            margin-top: 0;
+        }
+
+        .dept-scores-content:not(.collapsed) {
+            max-height: 2000px;
+            opacity: 1;
+            margin-top: 12px;
+        }
+
+        .dept-scores-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 8px;
+            max-width: 732px;
+            /* Match main grid width */
+        }
+
+        .dept-score-item {
+            background: #f8f9fc;
+            border: 1px solid #e9ecf1;
+            border-radius: 12px;
+            padding: 14px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+
+        .dept-score-item:hover {
+            background: #f1f5f9;
+            border-color: #d1d5db;
+            transform: translateY(-1px);
+        }
+
+        .dept-name {
+            font-size: 13px;
+            color: #444;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+
+        .dept-score {
+            font-weight: 700;
+            font-size: 15px;
+            color: #111;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        .dept-category-label {
+            grid-column: 1 / -1;
+            background: #2563eb;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            text-align: center;
+            margin: 8px 0 4px 0;
+        }
+
+        .toggle-btn.expanded .toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        @media (max-width: 720px) {
+            .dept-scores-list {
+                grid-template-columns: 1fr;
+                gap: 6px;
+            }
+
+            .dept-score-item {
+                padding: 12px 14px;
+            }
+
+            .dept-name {
+                font-size: 12px;
+            }
+
+            .dept-score {
+                font-size: 14px;
+            }
+
+            .toggle-btn {
+                padding: 5px 8px;
+                font-size: 11px;
+            }
+
+            .dept-scores-header h3 {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="container">
+            <h1>전공배정 성적 계산기 <small class="muted">(2025)</small></h1>
+        </div>
+    </header>
+    <main class="container">
+        <div class="card">
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+                <label for="categorySel" class="muted" style="min-width:65px;">계열 선택</label>
+                <select id="categorySel" style="max-width:200px;">
+                    <option value="">전체</option>
+                    <option value="공학계열1">공학계열1</option>
+                    <option value="공학계열2">공학계열2</option>
+                </select>
+                <label for="deptSel" class="muted" style="min-width:65px;">학과 선택</label>
+                <select id="deptSel" style="max-width:320px;"></select>
+            </div>
+
+            <div class="row header" style="margin-bottom:6px;">
+                <div>과목명</div>
+                <div>학점</div>
+                <div>평가방식</div>
+                <div>성적</div>
+                <div></div>
+            </div>
+            <div id="rows"></div>
+            <!-- <div style="display:flex; gap:8px; margin-top:8px;"> -->
+            <div class="actions">
+                <button class="add" id="addRow">+ 과목 추가</button>
+                <button id="reset">초기화</button>
+            </div>
+
+            <div class="notice">
+                가중치 적용 과목: 수학1, 수학2, 일반물리학1, 일반물리학2, 일반화학1, 일반화학2, 일반생물학1,
+                웹프로그래밍기초, 인공지능의이해, 컴퓨터과학과코딩, C언어기초, 데이터과학기초, 알고리즘단계적사고,
+                빅데이터이해및활용 (학과별 적용 과목 및 가중치 비율이 다름) <br />
+            </div>
+            <div class="summary">
+                <div class="item"><span>총 이수학점</span><strong id="totalCredits">0</strong></div>
+                <div class="item"><span>GPA</span><strong id="gpa">0.00</strong></div>
+                <div class="item final"><span>최종 점수</span><strong id="finalScore">48.57</strong></div>
+            </div>
+        </div>
+
+        <div class="card dept-scores-card">
+            <div class="dept-scores-header">
+                <h3>전 학과 점수 비교</h3>
+                <button id="toggleDeptScores" class="toggle-btn">
+                    <span class="toggle-text">펼치기</span>
+                    <span class="toggle-icon">▼</span>
+                </button>
+            </div>
+            <div id="deptScoresContent" class="dept-scores-content collapsed">
+                <div id="deptScoresList" class="dept-scores-list">
+                </div>
+            </div>
+        </div>
+    </main>
+    <script>
+        const DEPT_WEIGHTS = {
+            "건축공학과": { "수학1": 1.2, "수학2": 1.2, "일반물리학1": 1.2, "컴퓨터과학과코딩": 1.1 },
+            "고분자.나노공학과": { "일반물리학1": 1.2, "일반물리학2": 1.2, "일반화학1": 1.5, "일반화학2": 1.5, },
+            "기계공학과": { "수학1": 1.5, "수학2": 1.5, "일반물리학1": 1.5, "일반물리학2": 1.5 },
+            "기계설계공학부(기계설계공학)": {},
+            "기계설계공학부(나노바이오기계시스템공학)": {},
+            "기계시스템공학부": {},
+            "도시공학과": { "수학1": 1.2, "일반물리학1": 1.2, "컴퓨터과학과코딩": 1.2 },
+            "바이오메디컬공학부": { "일반생물학1": 1.2 },
+            "산업정보시스템공학과": { "수학1": 1.5, "수학2": 1.2, "일반물리학1": 1.2, "웹프로그래밍기초": 1.5, "인공지능의이해": 1.2, "컴퓨터과학과코딩": 1.5, "c언어기초": 1.5, "데이터과학기초": 1.5, "알고리즘단계적사고": 1.5, "빅데이터이해및활용": 1.5 },
+            "소프트웨어공학과": { "수학1": 1.5, "수학2": 1.5, "일반물리학1": 1.2, "컴퓨터과학과코딩": 1.5, "c언어기초": 1.5 },
+            "신소재공학부(금속시스템공학)": { "일반화학1": 1.2, "일반화학2": 1.2 },
+            "신소재공학부(전자재료공학)": { "수학1": 1.2, "수학2": 1.2, "일반물리학1": 1.2, "일반물리학2": 1.1, "일반화학1": 1.2, "일반화학2": 1.1 },
+            "유기소재섬유공학과": {},
+            "융합기술공학부(IT융합기전공학)": { "수학1": 1.2, "일반물리학1": 1.2 },
+            "융합기술공학부(IT응용시스템공학)": {},
+            "토목/환경/자원.에너지공학부(자원.에너지공학)": { "수학1": 1.2, "수학2": 1.2, "일반물리학1": 1.2, "일반물리학2": 1.1, "일반화학1": 1.2, "일반화학2": 1.1 },
+            "전기공학과": { "수학1": 1.2, "수학2": 1.2, "일반물리학2": 1.2 },
+            "토목/환경/자원.에너지공학부(토목공학)": { "수학1": 1.5, "수학2": 1.5, "일반물리학1": 1.5, "웹프로그래밍기초": 1.3, "인공지능의이해": 1.3, "컴퓨터과학과코딩": 1.3, "c언어기초": 1.3, "데이터과학기초": 1.3, "알고리즘단계적사고": 1.3, "빅데이터이해및활용": 1.3 },
+            "항공우주공학과": {},
+            "화학공학부": { "수학1": 1.1, "수학2": 1.1, "일반물리학1": 1.1, "일반물리학2": 1.2, "일반화학1": 1.1, "일반화학2": 1.2 },
+            "토목/환경/자원.에너지공학부(환경공학)": { "수학1": 1.1, "수학2": 1.1, "일반물리학1": 1.1, "일반화학1": 1.1, "일반화학2": 1.1, "컴퓨터과학과코딩": 1.1 },
+            "신소재공학부(정보소재공학)": {},
+            "양자시스템공학과": {},
+            "전자공학부": { "수학1": 1.5, "수학2": 1.5, "일반물리학1": 1.5, "일반물리학2": 1.5, "컴퓨터과학과코딩": 1.5 },
+            "컴퓨터인공지능학부": { "컴퓨터과학과코딩": 1.5, "c언어기초": 1.5 }
+        };
+        const DEPARTMENTS = Object.keys(DEPT_WEIGHTS);
+        function normName(s) { return (s || "").toString().replace(/\s+/g, "").replace(/[.,]/g, "").toLowerCase(); }
+        function getWeight(dept, courseName) {
+            const m = DEPT_WEIGHTS[dept] || {};
+            const w = m[normName(courseName)];
+            return (typeof w === 'number' && !isNaN(w)) ? w : 1;
+        }
+        const GPA_MAX = 4.5;
+        const SCORE_BASE = 48.57;
+        const SCORE_MAX = 100.0;
+        const GRADE_TO_GPA = {
+            "A+": 4.5, "A0": 4.0, "B+": 3.5, "B0": 3.0,
+            "C+": 2.5, "C0": 2.0, "D+": 1.5, "D0": 1.0, "F": 0.0
+        };
+        function creditBonus(c) {
+            if (c <= 12) return 0;
+            if (c <= 15) return 1;
+            if (c <= 18) return 2;
+            if (c <= 21) return 4;
+            if (c <= 25) return 8;
+            if (c <= 29) return 14;
+            if (c <= 33) return 20;
+            return 30;
+        }
+
+        function gpaToScore(gpa) {
+            const score = SCORE_BASE + (gpa / GPA_MAX) * (SCORE_MAX - SCORE_BASE);
+            return Math.round(score * 100) / 100;
+        }
+
+        function gradeOptions() {
+            return `
+        <option value="">선택</option>
+        <option value="A+">A+</option>
+        <option value="A0">A0</option>
+        <option value="B+">B+</option>
+        <option value="B0">B0</option>
+        <option value="C+">C+</option>
+        <option value="C0">C0</option>
+        <option value="D+">D+</option>
+        <option value="D0">D0</option>
+        <option value="F">F</option>
+      `;
+        }
+        function nameFieldTemplate() {
+            return `
+        <div class="fieldwrap">
+          <input placeholder="예: 수학1" class="name"/>
+          <span class="dupWarn" title="중복된 과목명입니다.">중복</span>
+        </div>
+      `;
+        }
+        function rowTemplate(id) {
+            return `
+        <div class="row" data-id="${id}">
+          ${nameFieldTemplate()}
+          <input type="number" class="credits" placeholder="3" inputmode="decimal" />
+          <select class="evalType">
+            <option value="graded">등급</option>
+            <option value="pf">P/F</option>
+          </select>
+          <select class="gradeList">
+            ${gradeOptions()}
+          </select>
+          <select class="pf pf-hidden">
+            <option value="P">P (Pass)</option>
+            <option value="F">F (Fail)</option>
+          </select>
+          <button class="del" title="삭제">×</button>
+        </div>
+      `;
+        }
+        const rowsEl = document.getElementById('rows');
+        const addRowBtn = document.getElementById('addRow');
+        const resetBtn = document.getElementById('reset');
+        const totalCreditsEl = document.getElementById('totalCredits');
+        const gpaEl = document.getElementById('gpa');
+        const finalScoreEl = document.getElementById('finalScore');
+        const deptSel = document.getElementById('deptSel');
+        const categorySel = document.getElementById('categorySel');
+        const toggleDeptScoresBtn = document.getElementById('toggleDeptScores');
+        const deptScoresContent = document.getElementById('deptScoresContent');
+        const deptScoresList = document.getElementById('deptScoresList');
+        let counter = 0;
+
+        // 가중치 적용 과목 하이라이트
+        function updateWeightHighlights() {
+            const dept = deptSel ? deptSel.value : null;
+            document.querySelectorAll('#rows .row').forEach(row => {
+                const cname = (row.querySelector('.fieldwrap .name')?.value || '').trim();
+                const w = dept ? getWeight(dept, cname) : 1;
+                if (w > 1) {
+                    row.classList.add('wgt');
+                    row.querySelector('.fieldwrap')?.setAttribute('title', `가중치 적용: ×${w}`);
+                } else {
+                    row.classList.remove('wgt');
+                    row.querySelector('.fieldwrap')?.removeAttribute('title');
+                }
+            });
+        }
+
+        // 학과를 공학계열1과 공학계열2로 분류
+        const CATEGORY_MAPPING = {
+            "공학계열1": [
+                "건축공학과", "고분자.나노공학과", "기계공학과", "기계설계공학부(기계설계공학)",
+                "기계설계공학부(나노바이오기계시스템공학)", "기계시스템공학부", "도시공학과",
+                "바이오메디컬공학부", "산업정보시스템공학과", "소프트웨어공학과", "신소재공학부(금속시스템공학)",
+                "신소재공학부(전자재료공학)", "유기소재섬유공학과", "융합기술공학부(IT융합기전공학)",
+                "융합기술공학부(IT응용시스템공학)", "토목/환경/자원.에너지공학부(자원.에너지공학)",
+                "전기공학과", "토목/환경/자원.에너지공학부(토목공학)", "항공우주공학과",
+                "화학공학부", "토목/환경/자원.에너지공학부(환경공학)"
+            ],
+            "공학계열2": [
+                "신소재공학부(정보소재공학)", "양자시스템공학과", "전자공학부", "컴퓨터인공지능학부"
+            ]
+        };
+
+        function initDepartments() {
+            // 전체 학과 옵션으로 초기화
+            updateDepartmentOptions("");
+            const saved = localStorage.getItem('calc_dept_v1');
+            if (saved && DEPARTMENTS.includes(saved)) deptSel.value = saved;
+            deptSel.addEventListener('change', () => { localStorage.setItem('calc_dept_v1', deptSel.value); recalc(); updateWeightHighlights(); });
+        }
+
+        function updateDepartmentOptions(category) {
+            if (category === "") {
+                // 전체 학과 표시
+                deptSel.innerHTML = DEPARTMENTS.map(d => `<option value="${d}">${d}</option>`).join('');
+            } else {
+                // 선택된 계열의 학과만 표시
+                const depts = CATEGORY_MAPPING[category] || [];
+                deptSel.innerHTML = depts.map(d => `<option value="${d}">${d}</option>`).join('');
+            }
+        }
+
+        function addRow(prefill) {
+            rowsEl.insertAdjacentHTML('beforeend', rowTemplate(++counter));
+            const row = rowsEl.lastElementChild;
+            attachHandlers(row);
+            if (prefill) {
+                row.querySelector('.name input, .name').value = prefill.name || '';
+                row.querySelector('.credits').value = prefill.credits || '';
+                row.querySelector('.evalType').value = prefill.evalType || 'graded';
+                if (prefill.evalType === 'graded') {
+                    row.querySelector('.gradeList').value = (prefill.grade && String(prefill.grade).toUpperCase()) || '';
+                } else {
+                    row.querySelector('.pf').value = prefill.pf || 'P';
+                }
+                updateEvalUI(row);
+            }
+            save();
+            detectDuplicateNames(); // 추가 후 즉시 중복 검사
+        }
+        function attachHandlers(row) {
+            row.querySelectorAll('input, select').forEach(inp => {
+                inp.addEventListener('input', () => { recalc(); detectDuplicateNames(); updateWeightHighlights(); });
+                inp.addEventListener('change', () => { recalc(); detectDuplicateNames(); updateWeightHighlights(); });
+            });
+            row.querySelector('.evalType').addEventListener('change', () => {
+                updateEvalUI(row);
+                recalc(); detectDuplicateNames();
+            });
+            row.querySelector('.del').addEventListener('click', () => {
+                row.remove(); recalc(); detectDuplicateNames(); save();
+            });
+        }
+        function updateEvalUI(row) {
+            const type = row.querySelector('.evalType').value;
+            const gradeList = row.querySelector('.gradeList');
+            const pfEl = row.querySelector('.pf');
+            if (type === 'graded') {
+                gradeList.classList.remove('pf-hidden');
+                pfEl.classList.add('pf-hidden');
+            } else {
+                gradeList.classList.add('pf-hidden');
+                pfEl.classList.remove('pf-hidden');
+            }
+        }
+        function parseGradeFromList(v) {
+            if (!v) return NaN;
+            const s = v.toString().trim().toUpperCase();
+            return GRADE_TO_GPA.hasOwnProperty(s) ? GRADE_TO_GPA[s] : NaN;
+        }
+
+        function calculateScoreForDepartment(targetDept) {
+            let totalCreditsForBonus = 0;
+            let gradedCredits = 0;
+            let totalPoints = 0;
+            let wNumer = 0;
+            let denomAll = 0;
+
+            document.querySelectorAll('#rows .row').forEach(row => {
+                const cname = (row.querySelector('.fieldwrap .name')?.value || '').trim();
+                const c = Number(row.querySelector('.credits').value);
+                const type = row.querySelector('.evalType').value;
+                const gradeSel = row.querySelector('.gradeList').value;
+                const pfSel = row.querySelector('.pf').value;
+
+                let isValid = !!cname && !isNaN(c) && c > 0 && ((type === 'graded' && !!gradeSel) || (type !== 'graded' && !!pfSel));
+                if (!isValid) return;
+
+                totalCreditsForBonus += c;
+
+                if (type === 'graded') {
+                    const g = parseGradeFromList(gradeSel);
+                    if (!isNaN(g)) {
+                        gradedCredits += c;
+                        totalPoints += c * g;
+                        denomAll += c;
+                        const w = getWeight(targetDept, cname);
+                        wNumer += g * c * (w - 1);
+                    }
+                }
+            });
+
+            const gpa = gradedCredits > 0 ? (totalPoints / gradedCredits) : 0;
+            const baseScore = gpaToScore(gpa);
+            const bonus = creditBonus(totalCreditsForBonus);
+            const weightedAvg = denomAll > 0 ? Math.round((wNumer / denomAll) * 1000) / 1000 : 0; // 가중치 평균평점(보정치)
+            const weightedScorePlus = gpaToScore(weightedAvg) - SCORE_BASE;
+            const finalScore = baseScore + bonus + weightedScorePlus;
+
+            return finalScore;
+        }
+
+        function updateAllDepartmentScores() {
+            const scores = [];
+            let htmlContent = [];
+
+            // CATEGORY_MAPPING을 사용하여 계열별로 정리된 출력
+            Object.entries(CATEGORY_MAPPING).forEach(([categoryName, departments]) => {
+                // 계열 레이블 추가
+                htmlContent.push(`<div class="dept-category-label">${categoryName}</div>`);
+
+                departments.forEach(dept => {
+                    const score = calculateScoreForDepartment(dept);
+                    scores.push({
+                        name: dept,
+                        score: score
+                    });
+
+                    htmlContent.push(`
+                        <div class="dept-score-item">
+                            <div class="dept-name" title="${dept}">${dept}</div>
+                            <div class="dept-score">${score.toFixed(2)}</div>
+                        </div>
+                    `);
+                });
+            });
+
+            deptScoresList.innerHTML = htmlContent.join('');
+        }
+
+        function recalc() {
+            let totalCreditsForBonus = 0;
+            let gradedCredits = 0;
+            let totalPoints = 0;
+            let wNumer = 0;
+            let denomAll = 0;
+            const dept = deptSel ? deptSel.value : null;
+            document.querySelectorAll('#rows .row').forEach(row => {
+                const cname = (row.querySelector('.fieldwrap .name')?.value || '').trim();
+                const c = Number(row.querySelector('.credits').value);      // 학점
+                const type = row.querySelector('.evalType').value;
+                const gradeSel = row.querySelector('.gradeList').value;
+                const pfSel = row.querySelector('.pf').value;
+
+                // 유효성: 과목명, 학점, 성적/등급(또는 P/F)이 모두 입력되어야 포함
+                let isValid = !!cname && !isNaN(c) && c > 0 && ((type === 'graded' && !!gradeSel) || (type !== 'graded' && !!pfSel));
+                if (!isValid) return;
+
+                totalCreditsForBonus += c;  // 모든 과목 학점(유효한 행만)
+
+                if (type === 'graded') {
+                    const g = parseGradeFromList(gradeSel);
+                    if (!isNaN(g)) {
+                        gradedCredits += c;
+                        totalPoints += c * g;
+                        denomAll += c;  // P/F를 제외한 모든 과목 학점
+                        const w = dept ? getWeight(dept, cname) : 1;
+                        wNumer += g * c * (w - 1);
+                    }
+                }
+            });
+            const gpa = gradedCredits > 0 ? (totalPoints / gradedCredits) : 0;
+            const baseScore = gpaToScore(gpa);
+            const bonus = creditBonus(totalCreditsForBonus);
+            const weightedAvg = denomAll > 0 ? Math.round((wNumer / denomAll) * 1000) / 1000 : 0; // 가중치 평균평점(보정치)
+            const weightedScorePlus = gpaToScore(weightedAvg) - (SCORE_BASE); // 실점 환산 후 48.57 빼기
+            const finalScore = baseScore + bonus + weightedScorePlus;
+
+            totalCreditsEl.textContent = totalCreditsForBonus.toFixed(1);
+            gpaEl.textContent = gpa.toFixed(2);
+            finalScoreEl.textContent = `${finalScore.toFixed(2)} = ${baseScore.toFixed(2)} + ${bonus.toFixed(2)} + ${weightedScorePlus.toFixed(2)}`;
+            save();
+            updateWeightHighlights();
+            updateAllDepartmentScores();
+        }
+
+        function save() {
+            const data = [];
+            document.querySelectorAll('#rows .row').forEach(row => {
+                data.push({
+                    name: (row.querySelector('.name input') ? row.querySelector('.name input').value : row.querySelector('.fieldwrap .name')?.value) || row.querySelector('.fieldwrap .name')?.value || '',
+                    credits: row.querySelector('.credits').value,
+                    evalType: row.querySelector('.evalType').value,
+                    grade: row.querySelector('.gradeList').value,
+                    pf: row.querySelector('.pf').value
+                });
+            });
+            localStorage.setItem('calc_rows_v2c', JSON.stringify(data));
+        }
+        function restore() {
+            const raw = localStorage.getItem('calc_rows_v2c') || localStorage.getItem('calc_rows_v2b') || localStorage.getItem('calc_rows_v2');
+            if (raw) {
+                try {
+                    const data = JSON.parse(raw);
+                    if (Array.isArray(data) && data.length) {
+                        rowsEl.innerHTML = '';
+                        data.forEach(item => addRow(item));
+                        recalc();
+                        detectDuplicateNames();
+                        return;
+                    }
+                } catch (e) { }
+            }
+            addRow();
+        }
+
+        function detectDuplicateNames() {
+            const nameMap = {};
+            const rows = Array.from(document.querySelectorAll('#rows .row'));
+            rows.forEach(row => {
+                const val = (row.querySelector('.fieldwrap .name')?.value || '').trim().toLowerCase();
+                if (!val) return;
+                nameMap[val] = (nameMap[val] || 0) + 1;
+            });
+            rows.forEach(row => {
+                const input = row.querySelector('.fieldwrap .name');
+                const wrap = row.querySelector('.fieldwrap');
+                const val = (input?.value || '').trim().toLowerCase();
+                if (val && nameMap[val] > 1) {
+                    row.classList.add('dup');
+                    wrap?.setAttribute('title', '중복된 과목명입니다.');
+                } else {
+                    row.classList.remove('dup');
+                    wrap?.removeAttribute('title');
+                }
+            });
+        }
+        addRowBtn.addEventListener('click', () => { addRow(); });
+        resetBtn.addEventListener('click', () => {
+            if (confirm('모든 입력을 초기화할까요?')) {
+                localStorage.removeItem('calc_rows_v2c');
+                rowsEl.innerHTML = ''; addRow(); recalc(); detectDuplicateNames();
+            }
+        });
+
+        toggleDeptScoresBtn.addEventListener('click', () => {
+            const isCollapsed = deptScoresContent.classList.contains('collapsed');
+            if (isCollapsed) {
+                deptScoresContent.classList.remove('collapsed');
+                toggleDeptScoresBtn.classList.add('expanded');
+                toggleDeptScoresBtn.querySelector('.toggle-text').textContent = '접기';
+            } else {
+                deptScoresContent.classList.add('collapsed');
+                toggleDeptScoresBtn.classList.remove('expanded');
+                toggleDeptScoresBtn.querySelector('.toggle-text').textContent = '펼치기';
+            }
+        });
+
+        // 계열 선택 이벤트 리스너 추가
+        categorySel.addEventListener('change', () => {
+            const selectedCategory = categorySel.value;
+            updateDepartmentOptions(selectedCategory);
+            // 첫 번째 학과로 자동 선택
+            if (deptSel.options.length > 0) {
+                deptSel.selectedIndex = 0;
+                localStorage.setItem('calc_dept_v1', deptSel.value);
+                recalc();
+                updateWeightHighlights();
+            }
+        });
+
+        initDepartments();
+        restore();
+    </script>
+</body>
+
+</html>
